@@ -6,6 +6,9 @@
 script/source = "extends Node2D
 
 var save = {}
+
+# Default data for SAVE.data
+var default_data = {\"win\":false, \"PostRunAnimation\":false, \"WP\":\"\", \"name\":\"\", \"namefound\":0, \"tts_sn\":0, \"sp\":0, \"dataSP\":0, \"dfs\":0, \"ContAcc\":0, \"RESET\":false, \"KCount\":0, \"Colour\":\"\", \"name_valid\":false, \"colour_valid\":false, \"emailBox\":[], \"lastSave\":\"never\", \"Endings\":[], \"Memory\":[], \"postgame\":false, \"PLAYER_FavWord\":\"\", \"PLAYER_Super\":\"\", \"PLAYER_redyrepair\":{}, \"PP_Painting\":false, \"Act1_hang\":false, \"BDAY\":0, \"BMONTH\":0, \"LastName\":\"\", \"ACT3_Weather\":\"\", \"ACT3_Place\":\"\", \"F_Food\":\"\", \"F_Game\":\"\", \"PET_Name\":\"\", \"PET_Type\":\"\"}
 var modifyingSave = {}
 
 # Called when the node enters the scene tree for the first time.
@@ -33,6 +36,7 @@ func _open_file(file_path):
 		print(\"ERROR: Unable to open file, please ensure this is loaded on the same computer the save file was created on.\")
 		return false
 	save = file.get_var()
+	file.close()
 	print(save)
 	_fill_table()
 	pass
@@ -45,6 +49,8 @@ func _fill_table():
 	for key in save:
 		print(key)
 		var value = str(save[key])
+		if(value == \"True\" or value == \"False\"):
+			value = value.to_lower()
 		print(value)
 		table_node.CreateNewDataRow(key,value)
 		pass
@@ -53,6 +59,8 @@ func _fill_table():
 func _get_table():
 	var table_node = get_node(\"Table\")
 	modifyingSave = table_node.GetDataRows()
+	modifyingSave = reformat_save(modifyingSave) 
+	## Because editor assumes everything is a string... we need to convert back
 	print(modifyingSave)
 	pass
 
@@ -74,6 +82,22 @@ func _on_Button2_pressed():
 	file.close()
 	print(\"Saved to: \" + file_path)
 	pass # Replace with function body.
+
+func reformat_save(mod_save):
+	for key in mod_save:
+#		print(\"key type of \", save[key] ,\" is: \", str(typeof(default_data[key])))
+#		match typeof(default_data[key]):
+#			TYPE_BOOL:
+#				print(\"bool, changing\")
+#				# LETS HOPE this is either 0 or 1
+#				mod_save[key] = bool(int(mod_save[key]))
+#			TYPE_STRING:
+#				print(\"string, not changing\")
+#			TYPE_INT:
+#				mod_save[key] = int(mod_save[key])
+		mod_save[key] = str2var(mod_save[key])
+			
+	return mod_save
 "
 
 [node name="Node2D" type="Node2D"]
