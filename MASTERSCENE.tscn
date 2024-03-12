@@ -13,6 +13,13 @@ var modifyingSave = {}
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
+	$ComputerIDBox.text = OS.get_unique_id()
+	$FixSPDialog.get_ok().set_visible(false)
+	$FixSPDialog.add_button(\"Use sp\", false, \"sp\")
+	$FixSPDialog.add_button(\"Use dataSP\", true, \"datasp\")
+	$FixSPDialog.add_button(\"Ignore\", true, \"\")
+	
+	$AcceptDialog.popup()
 	pass # Replace with function body.
 
 
@@ -21,7 +28,7 @@ func _ready():
 #	pass
 
 func _on_Button_pressed():
-	var file_path = get_node(\"SavePathBox\").text
+	var file_path = $SavePathBox.text
 	_open_file(file_path)
 	pass
 
@@ -29,11 +36,14 @@ func _on_Button_pressed():
 func _open_file(file_path):
 	var file = File.new()
 	if(!file.file_exists(file_path)):
-		print(\"ERROR: Can not find save file.\")
+		_err(\"ERROR: Can not find save file.\")
 		return false
-	var err = file.open_encrypted_with_pass(file_path, File.READ, OS.get_unique_id())
+	var unique_id = OS.get_unique_id()
+	if $ComputerIDBox.text != \"\":
+		unique_id = $ComputerIDBox.text
+	var err = file.open_encrypted_with_pass(file_path, File.READ, unique_id)
 	if(err != OK):
-		print(\"ERROR: Unable to open file, please ensure this is loaded on the same computer the save file was created on.\")
+		_err(\"ERROR: Unable to open file, please ensure you are using the same unique id for the computer the save was made on.\")
 		return false
 	save = file.get_var()
 	file.close()
@@ -43,12 +53,13 @@ func _open_file(file_path):
 
 
 func _fill_table():
-	var table_node = get_node(\"Table\")
+	var table_node = $Table
 	if(table_node.get_row_count() > 0):
 		table_node.clear_rows()
 	for key in save:
 		print(key)
 		var value = str(save[key])
+		# strings parse booleans as True or False... why???!?
 		if(value == \"True\" or value == \"False\"):
 			value = value.to_lower()
 		print(value)
@@ -57,16 +68,25 @@ func _fill_table():
 	pass
 	
 func _get_table():
-	var table_node = get_node(\"Table\")
+	var table_node = $Table
 	modifyingSave = table_node.GetDataRows()
-	modifyingSave = reformat_save(modifyingSave) 
 	## Because editor assumes everything is a string... we need to convert back
+	modifyingSave = reformat_save(modifyingSave) 
 	print(modifyingSave)
 	pass
 
 
-func _on_Button2_pressed():
+func _on_SaveButton_pressed():
+	if(save == {}):
+		return
 	_get_table()
+	if(modifyingSave.dataSP != modifyingSave.sp):
+		$FixSPDialog.popup_centered()
+		return
+	_save_file()
+	pass # Replace with function body.
+
+func _save_file():
 	var file = File.new()
 	var file_path = get_node(\"SavePathBox\").text
 	if(file.file_exists(file_path)):
@@ -77,27 +97,57 @@ func _on_Button2_pressed():
 			dir.remove(bak_file_path)
 		dir.rename(file_path, bak_file_path)
 		print(\"A backup is made to: \" + bak_file_path)
-	file.open_encrypted_with_pass(file_path, File.WRITE, OS.get_unique_id())
+	var unique_id = OS.get_unique_id()
+	if $ComputerIDBox.text != \"\":
+		unique_id = $ComputerIDBox.text
+	file.open_encrypted_with_pass(file_path, File.WRITE, unique_id)
+#	if(err != OK):
+#		_err(\"ERROR: Unable to save file, please ensure you are using the same unique id for the computer the save was made on.\")
+#		return false
 	file.store_var(modifyingSave)
 	file.close()
+	$SavedText.text = \"Saved to: \" + file_path
+	$SavedText.visible = true
 	print(\"Saved to: \" + file_path)
-	pass # Replace with function body.
+	pass
 
 func reformat_save(mod_save):
 	for key in mod_save:
-#		print(\"key type of \", save[key] ,\" is: \", str(typeof(default_data[key])))
-#		match typeof(default_data[key]):
-#			TYPE_BOOL:
-#				print(\"bool, changing\")
-#				# LETS HOPE this is either 0 or 1
-#				mod_save[key] = bool(int(mod_save[key]))
-#			TYPE_STRING:
-#				print(\"string, not changing\")
-#			TYPE_INT:
-#				mod_save[key] = int(mod_save[key])
 		mod_save[key] = str2var(mod_save[key])
-			
 	return mod_save
+
+
+func _on_OpenFileButton_pressed():
+	$FileDialog.popup_centered()
+	pass
+	
+func _err(error):
+	print(error)
+	$ErrorDialog.dialog_text = error
+	$ErrorDialog.popup()
+	pass
+
+
+func _on_FileDialog_selected(path):
+	$SavePathBox.text = path
+	_open_file(path)
+	pass
+
+func _set_fix_sp(val):
+	if val == \"sp\":
+		modifyingSave.dataSP = modifyingSave.sp
+	elif val == \"datasp\":
+		modifyingSave.sp = modifyingSave.dataSP
+	$FixSPDialog.hide()
+	_save_file()
+	# Refreshing
+	_open_file($SavePathBox.text)
+	pass
+
+
+func _on_Timer_timeout():
+	$SavedText.visible = false
+	pass
 "
 
 [node name="Node2D" type="Node2D"]
@@ -106,6 +156,16 @@ script = SubResource( 1 )
 [node name="Panel" type="Panel" parent="."]
 margin_right = 1023.0
 margin_bottom = 599.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ComputerIDBox" type="LineEdit" parent="."]
+margin_left = 684.01
+margin_top = 12.0
+margin_right = 1008.01
+margin_bottom = 34.6701
+hint_tooltip = "Absolute Path to SAVE.data"
 __meta__ = {
 "_edit_use_anchors_": false
 }
@@ -121,10 +181,10 @@ __meta__ = {
 "_edit_use_anchors_": false
 }
 
-[node name="Button" type="Button" parent="."]
-margin_left = 354.0
+[node name="OpenButton" type="Button" parent="."]
+margin_left = 409.397
 margin_top = 12.0
-margin_right = 441.0
+margin_right = 496.397
 margin_bottom = 34.5
 text = "Open"
 __meta__ = {
@@ -132,9 +192,12 @@ __meta__ = {
 }
 
 [node name="Table" parent="." instance=ExtResource( 1 )]
+margin_top = 47.2683
+margin_right = 33.0
+margin_bottom = 47.2683
 size_flags_horizontal = 3
 
-[node name="Button2" type="Button" parent="."]
+[node name="SaveButton" type="Button" parent="."]
 margin_left = 928.352
 margin_top = 562.378
 margin_right = 1011.35
@@ -144,5 +207,91 @@ __meta__ = {
 "_edit_use_anchors_": false
 }
 
-[connection signal="pressed" from="Button" to="." method="_on_Button_pressed"]
-[connection signal="pressed" from="Button2" to="." method="_on_Button2_pressed"]
+[node name="FixSPDialog" type="AcceptDialog" parent="."]
+margin_left = 330.005
+margin_top = 276.004
+margin_right = 706.005
+margin_bottom = 408.004
+popup_exclusive = true
+window_title = "Fix editing mistake?"
+dialog_text = "Both sp (SavePoint) and dataSP are intended to be the same value.
+Would you like to fix this mistake?
+(If you know what you are doing, feel free to ignore)"
+dialog_autowrap = true
+
+[node name="FileDialog" type="FileDialog" parent="."]
+margin_left = 196.968
+margin_top = 162.652
+margin_right = 855.968
+margin_bottom = 434.652
+window_title = "Open a File"
+resizable = true
+mode = 0
+access = 2
+filters = PoolStringArray( "*.data" )
+show_hidden_files = true
+current_dir = "/Users/Nick/Documents/KinitoMod/Kinito Save Editor"
+current_path = "/Users/Nick/Documents/KinitoMod/Kinito Save Editor/"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="OpenFileButton" type="Button" parent="."]
+margin_left = 343.0
+margin_top = 12.0
+margin_right = 379.0
+margin_bottom = 34.5
+text = "..."
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ErrorDialog" type="AcceptDialog" parent="."]
+margin_left = 318.0
+margin_top = 243.303
+margin_right = 710.0
+margin_bottom = 404.303
+resizable = true
+dialog_autowrap = true
+
+[node name="AcceptDialog" type="AcceptDialog" parent="."]
+margin_left = 382.0
+margin_top = 189.0
+margin_right = 661.0
+margin_bottom = 434.0
+mouse_filter = 2
+popup_exclusive = true
+window_title = "Disclaimer"
+dialog_text = "All changes are to be done under caution, a backup file is automatically generated when a save is made in case anything goes wrong.
+
+NOTE: The KinitoPET save file can include personal information if provided to the game. (This applies to the wallpaper path, first / last name and birthday).
+
+Use this tool at your own risk."
+dialog_autowrap = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="SavedText" type="RichTextLabel" parent="."]
+visible = false
+margin_left = 24.0
+margin_top = 568.0
+margin_right = 896.0
+margin_bottom = 584.0
+custom_colors/default_color = Color( 1, 1, 1, 1 )
+fit_content_height = true
+scroll_active = false
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Timer" type="Timer" parent="."]
+one_shot = true
+
+[connection signal="text_entered" from="SavePathBox" to="." method="_on_Button_pressed"]
+[connection signal="pressed" from="OpenButton" to="." method="_on_Button_pressed"]
+[connection signal="pressed" from="SaveButton" to="." method="_on_SaveButton_pressed"]
+[connection signal="custom_action" from="FixSPDialog" to="." method="_set_fix_sp"]
+[connection signal="file_selected" from="FileDialog" to="." method="_on_FileDialog_selected"]
+[connection signal="pressed" from="OpenFileButton" to="." method="_on_OpenFileButton_pressed"]
+[connection signal="timeout" from="Timer" to="." method="_on_Timer_timeout"]
